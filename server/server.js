@@ -2,7 +2,7 @@ const express = require("express");
 const mongoose = require("mongoose");
 const cors = require("cors");
 require("dotenv").config();
-console.log("🔥 THIS SERVER FILE IS RUNNING");
+console.log("THIS SERVER FILE IS RUNNING");
 const PORT = 8000;
 
 const app = express(); // first create app
