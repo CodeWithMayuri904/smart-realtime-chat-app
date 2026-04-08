@@ -43,8 +43,30 @@ io.on("connection", (socket) => {
 
     console.log("👤 Joined:", userId);
     console.log("Current users:", users);
+
+    // send online users to all
+    io.emit("onlineUsers", Object.keys(users));
   });
 
+  // typing...start
+  socket.on("typing", ({ sender, receiver }) => {
+    if (users[receiver]) {
+      users[receiver].forEach((id) => {
+        io.to(id).emit("typing", { sender });
+      });
+    }
+  });
+
+  //typing.. stop
+  socket.on("typing", ({ sender, receiver }) => {
+    if (users[receiver]) {
+      users[receiver].forEach((id) => {
+        io.to(id).emit("typing", { sender });
+      });
+    }
+  });
+
+  // messages
   socket.on("sendMessage", ({ sender, receiver, text }) => {
     console.log("📩 Message:", sender, "→", receiver);
 
@@ -73,6 +95,11 @@ io.on("connection", (socket) => {
         delete users[userId];
       }
     }
+
+    // update online users after disconnect
+    io.emit("onlineUsers", Object.keys(users));
+
+    console.log("❌Socket Disconnected:", socket.id);
   });
 });
 

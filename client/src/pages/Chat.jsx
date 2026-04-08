@@ -2,14 +2,25 @@ import { useState, useEffect, useRef } from "react";
 import axios from "axios";
 import io from "socket.io-client";
 
-const socket = io("http://localhost:3001");
+// const socket = io("http://localhost:3001");
 
 function Chat() {
+  const socketRef = useRef();
+
+  useEffect(() => {
+    socketRef.current = io("http://localhost:3001");
+    return () => {
+      socketRef.current.disconnect();
+    };
+  }, []);
+
   const [users, setUsers] = useState([]);
   const [search, setSearch] = useState("");
   const [selectedUser, setSelectedUser] = useState(null);
   const [messages, setMessages] = useState([]);
   const [text, setText] = useState("");
+  const [onlineUsers, setOnlineUsers] = useState([]);
+  const [typingUser, setTypingUser] = useState(null);
 
   const token = localStorage.getItem("token");
   const decoded = token ? JSON.parse(atob(token.split(".")[1])) : null;
@@ -37,7 +48,7 @@ function Chat() {
 
   // Join socket
   useEffect(() => {
-    if (me) socket.emit("join", me);
+    if (me) socketRef.current.emit("join", me);
   }, [me]);
 
   // Receive messages (FIXED)
@@ -48,30 +59,44 @@ function Chat() {
 
       if (
         selectedUser &&
-        (sender === selectedUser._id || receiver === selectedUser._id)
+        (
+          (sender === selectedUser._id && receiver === me) ||
+          (sender === me && receiver === selectedUser._id)
+        )
       ) {
         setMessages(prev => [...prev, msg]);
       }
     };
+    socketRef.current.on("receiveMessage", handleMessage);
 
-    // const handleMessage = (msg) => {
-    //    FIX: convert everything to string
-    //   const sender = msg.sender.toString();
-    //   const receiver = msg.receiver.toString();
-
-    //   if (
-    //     selectedUser &&
-    //     (sender === selectedUser._id || receiver === selectedUser._id)
-    //   ) {
-    //     setMessages(prev => [...prev, msg]);
-    //   }
-    // };
-
-    socket.on("receiveMessage", handleMessage);
-
-    return () => socket.off("receiveMessage", handleMessage);
+    return () => socketRef.current.off("receiveMessage", handleMessage);
   }, [selectedUser]);
 
+  useEffect(() => {
+    socketRef.current.on("onlineUsers", (users) => {
+      setOnlineUsers(users);
+    });
+  }, []);
+
+  useEffect(() => {
+    socketRef.current.on("typing", ({ sender }) => {
+      if (selectedUser && sender === selectedUser._id) {
+        setTypingUser(sender);
+
+        setTimeout(() => setTypingUser(null), 1500);
+      }
+    });
+  }, [selectedUser]);
+
+  // Typing indicator
+  const handleTyping = () => {
+    if (!selectedUser) return;
+
+    socketRef.current.emit("typing", {
+      sender: me,
+      receiver: selectedUser._id
+    });
+  };
 
   const openChat = async (user) => {
     setSelectedUser(user);
@@ -109,7 +134,7 @@ function Chat() {
       { headers: { Authorization: token } }
     );
 
-    socket.emit("sendMessage", {
+    socketRef.current.emit("sendMessage", {
       sender: me,
       receiver: selectedUser._id,
       text,
@@ -145,9 +170,17 @@ function Chat() {
               padding: "10px",
               cursor: "pointer",
               background: selectedUser?._id === u._id ? "#ddd" : "",
+              display: "flex",
+              justifyContent: "space-between",
+              alignItems: "center"
             }}
           >
-            {u.username}
+            <span>{u.username}</span>
+            
+            {/*  Online status */}
+            {onlineUsers.includes(u._id) && (
+              <span style={{ color: "green", fontSize: "12px" }}> ● online</span>
+            )}
           </div>
         ))}
       </div>
@@ -155,6 +188,12 @@ function Chat() {
       {/* Chat */}
       <div style={{ width: "70%", display: "flex", flexDirection: "column", padding: "10px" }}>
         <h3>{selectedUser ? selectedUser.username : "Select a user"}</h3>
+
+        {typingUser && (
+          <p style={{ fontSize: "12px", color: "gray" }}>
+            Typing...
+          </p>
+        )}
 
         <div style={{ flex: 1, overflowY: "auto", border: "1px solid #ccc", padding: "10px" }}>
           {messages.map((m, i) => {
@@ -193,7 +232,10 @@ function Chat() {
           <div style={{ display: "flex", marginTop: "10px" }}>
             <input
               value={text}
-              onChange={e => setText(e.target.value)}
+              onChange={(e) => {
+                setText(e.target.value);
+                handleTyping();
+              }}
               onKeyDown={e => e.key === "Enter" && sendMessage()}
               style={{ flex: 1, padding: "10px" }}
               placeholder="Type message..."
