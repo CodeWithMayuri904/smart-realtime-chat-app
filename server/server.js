@@ -1,42 +1,84 @@
-const express = require("express");
-const mongoose = require("mongoose");
-const cors = require("cors");
-require("dotenv").config();
-console.log("THIS SERVER FILE IS RUNNING");
-const PORT = 8000;
+import express from "express";
+import cors from "cors";
+import dotenv from "dotenv";
+import http from "http";
+import { Server } from "socket.io";
+import mongoose from "mongoose";
 
-const app = express(); // first create app
+import authRoutes from "./routes/authRoutes.js";
+import userRoutes from "./routes/userRoutes.js";
+import messageRoutes from "./routes/messageRoutes.js";
 
-// Middleware
+dotenv.config();
+
+const app = express();
 app.use(cors());
 app.use(express.json());
 
-// import routes
-const authRoutes = require("./routes/authRoutes");
-
-// Routes
-app.use("/api/auth", (req, res, next) => {
-  console.log("Auth route hit");
-  next();
-}, authRoutes);
-
-// DB connection
+// MongoDB connection
 mongoose.connect(process.env.MONGO_URI)
-  .then(() => console.log("MongoDB Connected✅"))
+  .then(() => console.log("MongoDB connected ✅"))
   .catch(err => console.log(err));
 
-// Test route
-app.get("/", (req, res) => {
-  res.send("API running...");
+// Routes
+app.use("/api/auth", authRoutes);
+app.use("/api/users", userRoutes);
+app.use("/api/messages", messageRoutes);
+
+// Server & Socket.io
+const server = http.createServer(app);
+const io = new Server(server, { cors: { origin: "*" } });
+
+const users = {}; // userId -> array of socketIds
+
+io.on("connection", (socket) => {
+  console.log("✅ Socket Connected:", socket.id);
+
+  socket.on("join", (userId) => {
+    if (!users[userId]) {
+      users[userId] = [];
+    }
+
+    users[userId].push(socket.id);
+
+    console.log("👤 Joined:", userId);
+    console.log("Current users:", users);
+  });
+
+  socket.on("sendMessage", ({ sender, receiver, text }) => {
+    console.log("📩 Message:", sender, "→", receiver);
+
+    const messageData = { sender, receiver, text };
+
+    // send to receiver (ALL tabs)
+    if (users[receiver]) {
+      users[receiver].forEach((id) => {
+        io.to(id).emit("receiveMessage", messageData);
+      });
+    }
+
+    // send to sender 
+    if (users[sender]) {
+      users[sender].forEach((id) => {
+        io.to(id).emit("receiveMessage", messageData);
+      });
+    }
+  });
+
+  socket.on("disconnect", () => {
+    for (let userId in users) {
+      users[userId] = users[userId].filter(id => id !== socket.id);
+
+      if (users[userId].length === 0) {
+        delete users[userId];
+      }
+    }
+  });
 });
 
-app.listen(PORT, () => {
-  console.log(`Server running on port ${PORT}`);
+// server.listen(process.env.PORT || 5000, () => console.log("Server running on 5000 ✅"));
+const PORT = 3001;
+
+server.listen(PORT, () => {
+  console.log("Server running on " + PORT);
 });
-
-app.get("/check", (req, res) => {
-  res.send("Working");
-});
-
-
-
