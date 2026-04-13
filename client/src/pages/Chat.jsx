@@ -150,86 +150,198 @@ function Chat() {
     u.username?.toLowerCase().includes(search.toLowerCase())
   );
 
-  return (
-    <div style={{ display: "flex", height: "100vh" }}>
-      
-      {/* Sidebar */}
-      <div style={{ width: "30%", borderRight: "1px solid gray", padding: "10px" }}>
+const formatDateLabel = (date) => {
+  const d = new Date(date);
+  const today = new Date();
+
+  const isToday =
+    d.toDateString() === today.toDateString();
+
+  const yesterday = new Date();
+  yesterday.setDate(today.getDate() - 1);
+
+  const isYesterday =
+    d.toDateString() === yesterday.toDateString();
+
+  if (isToday) return "Today";
+  if (isYesterday) return "Yesterday";
+
+  return d.toLocaleDateString();
+};
+
+
+
+return (
+  <div className="flex h-screen bg-[#020617] text-white">
+
+    {/* SIDEBAR */}
+    <div className="w-[300px] bg-[#020617] border-r border-gray-800 flex flex-col">
+
+      {/* Header */}
+      <div className="p-4 flex justify-between items-center border-b border-gray-800">
+        <h2 className="text-lg font-semibold">Messages</h2>
+        <span className="text-xl cursor-pointer">＋</span>
+      </div>
+
+      {/* Search */}
+      <div className="p-3">
         <input
-          placeholder="Search..."
+          placeholder="Search"
           value={search}
           onChange={e => setSearch(e.target.value)}
-          style={{ width: "100%", padding: "8px", marginBottom: "10px" }}
+          className="w-full px-3 py-2 rounded-md bg-[#0f172a] border border-gray-700 outline-none text-sm"
         />
+      </div>
 
+      {/* User List */}
+      <div className="flex-1 overflow-y-auto px-2">
         {filteredUsers.map(u => (
           <div
             key={u._id}
             onClick={() => openChat(u)}
-            style={{
-              padding: "10px",
-              cursor: "pointer",
-              background: selectedUser?._id === u._id ? "#ddd" : "",
-              display: "flex",
-              justifyContent: "space-between",
-              alignItems: "center"
-            }}
+            className={`flex items-center justify-between p-3 rounded-lg cursor-pointer mb-1 transition ${
+              selectedUser?._id === u._id
+                ? "bg-blue-600"
+                : "hover:bg-[#0f172a]"
+            }`}
           >
-            <span>{u.username}</span>
-            
-            {/*  Online status */}
+            <div className="flex items-center gap-3">
+              <div className="w-9 h-9 rounded-full bg-gray-600 flex items-center justify-center text-sm font-bold">
+                {u.username[0].toUpperCase()}
+              </div>
+
+              <div>
+                <p className="text-sm font-medium">{u.username}</p>
+                <p className="text-xs text-gray-400">
+                  {onlineUsers.includes(u._id) ? "Online" : "Offline"}
+                </p>
+              </div>
+            </div>
+
             {onlineUsers.includes(u._id) && (
-              <span style={{ color: "green", fontSize: "12px" }}> ● online</span>
+              <span className="text-green-400 text-xs">●</span>
             )}
           </div>
         ))}
       </div>
+    </div>
 
-      {/* Chat */}
-      <div style={{ width: "70%", display: "flex", flexDirection: "column", padding: "10px" }}>
-        <h3>{selectedUser ? selectedUser.username : "Select a user"}</h3>
+    {/* CHAT SECTION */}
+    <div className="flex-1 flex flex-col">
 
-        {typingUser && (
-          <p style={{ fontSize: "12px", color: "gray" }}>
-            Typing...
+      {/* TOP BAR */}
+      <div className="flex items-center justify-between px-6 py-4 border-b border-gray-800">
+        <div>
+          <h3 className="font-semibold text-lg">
+            {selectedUser ? selectedUser.username : "General Chat"}
+          </h3>
+
+          {/* ✅ Typing indicator here */}
+          <p className="text-xs text-gray-400">
+            {selectedUser
+              ? (typingUser ? "Typing..." : "Online")
+              : "Demo mode"}
           </p>
-        )}
-
-        <div style={{ flex: 1, overflowY: "auto", border: "1px solid #ccc", padding: "10px" }}>
-          {messages.map((m, i) => {
-            const isMe =
-              m.sender === me ||
-              m.sender?._id === me ||
-              m.sender?.toString() === me;
-
-            return (
-              <div
-                key={i}
-                style={{
-                  display: "flex",
-                  justifyContent: isMe ? "flex-end" : "flex-start",
-                  marginBottom: "10px",
-                }}
-              >
-                <div
-                  style={{
-                    background: isMe ? "#4CAF50" : "#eee",
-                    color: isMe ? "white" : "black",
-                    padding: "10px",
-                    borderRadius: "10px",
-                    maxWidth: "60%",
-                  }}
-                >
-                  {m.text}
-                </div>
-              </div>
-            );
-          })}
-          <div ref={bottomRef}></div>
         </div>
 
-        {selectedUser && (
-          <div style={{ display: "flex", marginTop: "10px" }}>
+      </div>
+
+      {/* MAIN CONTENT */}
+      {!selectedUser ? (
+        //  EMPTY STATE
+        <div className="flex-1 flex flex-col items-center justify-center text-center text-gray-400">
+
+          <div className="w-16 h-16 rounded-full bg-[#0f172a] flex items-center justify-center text-2xl mb-4">
+            💬
+          </div>
+
+          <h2 className="text-lg font-semibold text-white">
+            No messages yet
+          </h2>
+
+          <p className="text-sm mt-1">
+            Start a conversation by selecting a user
+          </p>
+        </div>
+      ) : (
+        <>
+          {/* MESSAGES */}
+          <div className="flex-1 overflow-y-auto px-6 space-y-4">
+            {messages.map((m, i) => {
+              const isMe =
+                m.sender === me ||
+                m.sender?._id === me ||
+                m.sender?.toString() === me;
+
+              const time = m.createdAt
+                ? new Date(m.createdAt).toLocaleTimeString([], {
+                    hour: "2-digit",
+                    minute: "2-digit"
+                  })
+                : "";
+              // CHECK PREVIOUS MESSAGE DATE
+              const prevMessage = messages[i - 1];
+
+              const showDate =
+                !prevMessage ||
+                new Date(prevMessage.createdAt || Date.now()).toDateString() !==
+                new Date(m.createdAt || Date.now()).toDateString();
+              
+
+               return (
+                <div key={i}>
+                  
+                  {/* ✅ DATE SEPARATOR */}
+                  {showDate && (
+                    <div className="text-center text-xs text-gray-500 my-3">
+                      {formatDateLabel(m.createdAt)}
+                    </div>
+                  )}
+
+                  {/* MESSAGE */}
+                  <div className={`flex ${isMe ? "justify-end" : "justify-start"}`}>
+                    <div className="flex items-end gap-2 max-w-[70%]">
+
+                      {!isMe && (
+                        <div className="w-8 h-8 rounded-full bg-gray-600 flex items-center justify-center text-xs">
+                          {selectedUser?.username?.[0]?.toUpperCase()}
+                        </div>
+                      )}
+
+                      <div>
+                        {!isMe && (
+                          <p className="text-xs text-gray-400 mb-1">
+                            {selectedUser?.username} • {time}
+                          </p>
+                        )}
+
+                        <div
+                          className={`px-4 py-2 rounded-2xl text-sm ${
+                            isMe
+                              ? "bg-blue-600 rounded-br-none"
+                              : "bg-[#1e293b] rounded-bl-none"
+                          }`}
+                        >
+                          {m.text}
+                        </div>
+
+                        {isMe && (
+                          <p className="text-xs text-gray-400 mt-1 text-right">
+                            {time} ✓✓
+                          </p>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
+
+            <div ref={bottomRef}></div>
+          </div>
+
+          {/* INPUT */}
+          <div className="px-6 py-4 border-t border-gray-800 flex items-center gap-3">
             <input
               value={text}
               onChange={(e) => {
@@ -237,15 +349,22 @@ function Chat() {
                 handleTyping();
               }}
               onKeyDown={e => e.key === "Enter" && sendMessage()}
-              style={{ flex: 1, padding: "10px" }}
-              placeholder="Type message..."
+              className="flex-1 px-4 py-3 rounded-full bg-[#0f172a] border border-gray-700 outline-none text-sm"
+              placeholder="Type a message..."
             />
-            <button onClick={sendMessage}>Send</button>
+
+            <button
+              onClick={sendMessage}
+              className="bg-blue-600 px-5 py-2 rounded-full hover:bg-blue-700 text-sm"
+            >
+              Send
+            </button>
           </div>
-        )}
-      </div>
+        </>
+      )}
     </div>
-  );
+  </div>
+);
 }
 
 export default Chat;
