@@ -21,6 +21,7 @@ function Chat() {
   const [text, setText] = useState("");
   const [onlineUsers, setOnlineUsers] = useState([]);
   const [typingUser, setTypingUser] = useState(null);
+  const [searchResults, setSearchResults] = useState([]);
 
   const token = localStorage.getItem("token");
   const decoded = token ? JSON.parse(atob(token.split(".")[1])) : null;
@@ -34,17 +35,30 @@ function Chat() {
   }, [messages]);
 
   // Fetch users
+  // useEffect(() => {
+  //   const fetchUsers = async () => {
+  //     const res = await axios.get("http://localhost:3001/api/users", {
+  //       headers: { Authorization: token },
+  //     });
+
+  //     setUsers(res.data.filter(u => u._id !== me));
+  //   };
+
+  //   if (token) fetchUsers();
+  // }, [token, me]);
+
+  // Fetch FRIENDS (sidebar)
+  const fetchFriends = async () => {
+    const res = await axios.get("http://localhost:3001/api/friends", {
+      headers: { Authorization: token },
+    });
+
+    setUsers(res.data);
+  };
+
   useEffect(() => {
-    const fetchUsers = async () => {
-      const res = await axios.get("http://localhost:3001/api/users", {
-        headers: { Authorization: token },
-      });
-
-      setUsers(res.data.filter(u => u._id !== me));
-    };
-
-    if (token) fetchUsers();
-  }, [token, me]);
+    if (token) fetchFriends();
+  }, [token]);
 
   // Join socket
   useEffect(() => {
@@ -169,6 +183,57 @@ const formatDateLabel = (date) => {
   return d.toLocaleDateString();
 };
 
+//ADD SEARCH API CALL 
+
+const handleSearch = async (value) => {
+  setSearch(value);
+
+  if (!value) {
+    setSearchResults([]);
+    return;
+  }
+
+  // const res = await axios.get(
+  //   `http://localhost:3001/api/users?search=${value}`
+  // );
+  const res = await axios.get(
+    `http://localhost:3001/api/users?search=${value}`,
+    {
+      headers: { Authorization: token }
+    }
+  );
+
+  setSearchResults(res.data.filter(u => u._id !== me));
+};
+
+//ADD FRIEND FUNCTION
+// const addFriend = async (id) => {
+//   await axios.post(
+//     "http://localhost:3001/api/friends/add",
+//     { friendId: id },
+//     { headers: { Authorization: token } }
+//   );
+
+//   fetchFriends(); // refresh sidebar
+//   setSearchResults([]); // clear search
+// };
+const addFriend = async (id) => {
+  try {
+    await axios.post(
+      "http://localhost:3001/api/friends/add",
+      { friendId: id },
+      { headers: { Authorization: token } }
+    );
+
+    fetchFriends(); // refresh sidebar
+    setSearchResults([]); // clear search
+  } catch (err) {
+    console.log(err.response?.data || err.message);
+    alert(err.response?.data?.msg || "Something went wrong");
+  }
+};
+
+
 
 
 return (
@@ -185,17 +250,46 @@ return (
 
       {/* Search */}
       <div className="p-3">
+
+        {searchResults.length > 0 && (
+          <div className="px-2">
+            {searchResults.map(u => (
+              <div
+                key={u._id}
+                className="flex justify-between items-center p-2 bg-[#0f172a] rounded mb-1"
+              >
+                <span>{u.username}</span>
+                {/* <button
+                  onClick={() => addFriend(u._id)}
+                  className="text-xs bg-blue-600 px-2 py-1 rounded"
+                > */}
+                <button
+                  disabled={users.some(f => f._id === u._id)}
+                  onClick={() => addFriend(u._id)}
+                  className="text-xs bg-blue-600 px-2 py-1 rounded disabled:bg-gray-500"
+                >
+                  {users.some(f => f._id === u._id) ? "Added" : "Add"}
+                </button>
+                  {/* Add
+                </button> */}
+              </div>
+            ))}
+          </div>
+        )}
+        
         <input
           placeholder="Search"
           value={search}
-          onChange={e => setSearch(e.target.value)}
+          onChange={e => handleSearch(e.target.value)}
           className="w-full px-3 py-2 rounded-md bg-[#0f172a] border border-gray-700 outline-none text-sm"
         />
       </div>
 
       {/* User List */}
       <div className="flex-1 overflow-y-auto px-2">
-        {filteredUsers.map(u => (
+        {/* {filteredUsers.map(u => ( */}
+        {/* {users.map(u => ( */}
+        {(search ? searchResults : users).map(u => (
           <div
             key={u._id}
             onClick={() => openChat(u)}
@@ -207,7 +301,8 @@ return (
           >
             <div className="flex items-center gap-3">
               <div className="w-9 h-9 rounded-full bg-gray-600 flex items-center justify-center text-sm font-bold">
-                {u.username[0].toUpperCase()}
+                {/* {u.username[0].toUpperCase()} */}
+                {u.username?.[0]?.toUpperCase()}
               </div>
 
               <div>
